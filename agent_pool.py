@@ -1,7 +1,7 @@
 import json
 
 
-class AgentTool:
+class AgentPool:
     def __init__(self):
         self.index = 0
         with open('agent.json', 'r', encoding='utf-8') as agent_file:

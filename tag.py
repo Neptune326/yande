@@ -3,7 +3,7 @@ import re
 import bs4
 import requests
 
-from MySqlTool import MySqlTool
+from mysql_tool import MySqlTool
 
 resp = requests.get(
     url='https://github.com/zhzwz/yande-re-chinese-patch',

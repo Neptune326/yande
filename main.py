@@ -1,174 +1,185 @@
 import atexit
-import json
 import os
 import random
 import sys
-import threading
 import time
 
 import bs4
 import requests
-from requests import Timeout, HTTPError, RequestException
-from requests.adapters import HTTPAdapter
-from urllib3 import Retry
 
-from AgentTool import AgentTool
-from MySqlTool import MySqlTool
-from RedisTool import RedisTool
+from agent_pool import AgentPool
+from clash_proxy import switch_proxy
+from download_task import DownloadTaskThread
+from mysql_tool import MySqlTool
+from yande_logger import YandeLogger
 
-# print("Hello, World!")
-# download(
-#     url='https://yande.re/post',
-#     path='D:\\files\\test\\test.txt'
-# )
-#
-page = 0
-GLOBAL_PATH = 'D:\\files\\yande\\'
+YANDE_RUNT_TIME_MINUTE = 10
+YANDE_PAGE = 0
+YANDE_SCORE = 100
+YANDE_PAGE_FAIL_COUNT = 0
+YANDE_FILE_PATH = 'D:\\files\\yande\\'
+MYSQL = MySqlTool(host='localhost', user='root', password='admin', database='neptune')
+config_data = MYSQL.query('select page, score from yande_config')
+if config_data:
+    YANDE_PAGE = int(config_data[0][0])
+    YANDE_SCORE = int(config_data[0][1])
+
+YANDE_LOGGER = YandeLogger(file_path='D:\\files\\logs\\yande')
+YANDE_AGENT_POOL = AgentPool()
+DOWNLOAD_INFO_LIST = []
 
 
 def main():
-    print("hello world")
-
-    mysql = MySqlTool(host='localhost', user='root', password='admin', database='neptune')
-
-    config_data = mysql.query('select page, score from yande_config')
-    global page
-    page = int(config_data[0][0])
-    score = int(config_data[0][1])
-
-    max_data = mysql.query('select max(yande_id),min(yande_id) from yande_img')
-    max_id = 0
-    min_id = 0
-    if max_data[0][0] is not None:
-        max_id = int(max_data[0][0])
-
-    if max_data[0][1] is not None:
-        min_id = int(max_data[0][1])
-
-    redis = RedisTool(host='localhost', port=6379, db=5)
-    tag_data = mysql.query('select en, cn from yande_tag')
-    for tag in tag_data:
-        redis.set(tag[0], tag[1])
-
-    with open('agentPool.json', 'r', encoding='utf-8') as agent_file:
-        pool = json.load(agent_file)
-
+    global YANDE_PAGE
+    start_time_stamp = time.time()
     try:
         while True:
-            # 休眠
+            crawler()
+            YANDE_PAGE += 1
+
+            run_time_stamp = time.time()
+            if run_time_stamp - start_time_stamp >= YANDE_RUNT_TIME_MINUTE * 60:
+                stop()
+                return
+
             time.sleep(random.randint(2, 5))
-            crawler(page, score, max_id, min_id, mysql, redis, pool)
-            page += 1
     except Exception as e:
-        mysql.execute('update yande_config set page = %s where id = 1', (page))
-        print(e)
+        save_config_db_data()
+        YANDE_LOGGER.log('error', f'发生异常: {e}')
 
 
-def crawler(page: int, score: int, max_id: int, min_id: int, mysql: MySqlTool, redis: RedisTool, proxy_pool: dict):
-    agent_pool = AgentTool()
-
-    url = f'https://yande.re/post.xml?page={page}'
+def crawler():
+    global YANDE_PAGE_FAIL_COUNT, YANDE_PAGE
+    url = f'https://yande.re/post.xml?page={YANDE_PAGE}'
     header = {
-        'User-Agent': agent_pool.get()
+        'User-Agent': YANDE_AGENT_POOL.get()
     }
     with requests.get(
             url=url,
-            headers=header,
-            proxies={
-                'http': proxy_pool[random.randint(0, len(proxy_pool) - 1)]
-            }
+            headers=header
     ) as response:
         if not response.ok:
-            mysql.execute('update yande_config set page = %s where id = 1', (page))
-            raise Exception(f'当前页面：{page} ,访问失败')
+            MYSQL.execute('update yande_config set page = %s where id = 1', YANDE_PAGE)
+            switch_proxy()
+            YANDE_PAGE_FAIL_COUNT += 1
+            if YANDE_PAGE_FAIL_COUNT > 5:
+                YANDE_LOGGER.log('error', f'连续访问失败超过5次，当前页面：{YANDE_PAGE}')
+                raise Exception(f'当前页面：{YANDE_PAGE} ,访问失败')
+            else:
+                YANDE_PAGE -= 1
+                return
         soup = bs4.BeautifulSoup(response.text, 'xml')
         dom = soup.select('post')
         for item in dom:
             id = int(item['id'])
-            print('page:', page, 'max_id:', max_id, 'id:', id, 'score:', item['score'])
-            if min_id <= id <= max_id:
+            YANDE_LOGGER.log('info', f'page:{YANDE_PAGE} id:{id} score:{item["score"]} rating:{item["rating"]}')
+            if int(item['score']) < YANDE_SCORE:
                 continue
-            if int(item['score']) < score:
+            if exist_db_data(id):
+                YANDE_LOGGER.log('info', f'IMAGE-id:{id}已存在')
                 continue
 
             rating = item['rating']
             tags = item['tags']
             file_url = item['file_url']
             file_ext = item['file_ext']
-            print(rating, id, tags, file_url, file_ext, int(item['score']))
+            YANDE_LOGGER.log('info',
+                             f'page:{YANDE_PAGE} id:{id} score:{item["score"]} rating:{item["rating"]} tags:{item["tags"]} file_url:{item["file_url"]} file_ext:{item["file_ext"]}')
             en_tag = '|'.join(tags.split(' '))
             name = f'{id}.{file_ext}'
-            dir_name = len(item['id']) < 4 and 'open' or item['id'][:len(item['id']) - 4]
-            if rating == 's':
-                dir_name = f'{GLOBAL_PATH}\\Safe\\{dir_name}'
-            else:
-                dir_name = f'{GLOBAL_PATH}\\Question\\{dir_name}'
+
+            dir_name = len(item['id']) < 4 and 'default' or item['id'][:len(item['id']) - 4]
+            dir_name = os.path.join(YANDE_FILE_PATH, rating == 's' and 'Safe' or 'Question', dir_name)
             if not os.path.exists(dir_name):
                 os.makedirs(dir_name)
 
-            path = f'{dir_name}\\{name}'
-            print(rating, id, path)
+            path = os.path.join(dir_name, name)
 
-            try:
-                download(
-                    file_url,
-                    path,
-                    proxies={
-                        'http': proxy_pool[random.randint(0, len(proxy_pool) - 1)]
-                    }
-                )
-                mysql.execute('insert into yande_img(yande_id,name,ext,en_tag) values (%s,%s,%s,%s)',
-                              (id, name, file_ext, en_tag))
-                time.sleep(random.randint(2, 5))
-            except Exception as e:
-                mysql.execute(
-                    'insert into yande_download_error(yande_id,name,ext,en_tag,file_url) values (%s,%s,%s,%s,%s)',
-                    (id, name, file_ext, en_tag, file_url))
-                print(e)
+            DOWNLOAD_INFO_LIST.append({
+                'id': id,
+                'name': name,
+                'ext': file_ext,
+                'path': path,
+                'tags': en_tag,
+                'file_url': file_url
+            })
+
+            if len(DOWNLOAD_INFO_LIST) >= 8:
+                download_result = threading_download_image()
+                if not download_result:
+                    MYSQL.execute('update yande_config set page = %s where id = 1', YANDE_PAGE)
+                    YANDE_LOGGER.log('error', f'threading_download_image failed')
+                    raise Exception('threading_download_image failed')
+                else:
+                    DOWNLOAD_INFO_LIST.clear()
+                    time.sleep(random.randint(2, 5))
 
 
-def download(url: str, path: str, proxies=None):
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) '
-                      'Chrome/58.0.3029.110 Safari/537.3'
-    }
-    session = requests.Session()
+def threading_download_image():
+    total_result = True
+    for info in DOWNLOAD_INFO_LIST:
+        thread = DownloadTaskThread(download_img, args=(info['file_url'], info['path'], YANDE_AGENT_POOL.get()))
+        thread.start()
+        thread.join()
+        YANDE_LOGGER.log('info', f'download {info["id"]} {info["name"]},result {thread.get_result()}')
+        if not thread.get_result():
+            total_result = False
+            MYSQL.execute(
+                'insert into yande_download_error(yande_id,name,ext,en_tag,file_url) values (%s,%s,%s,%s,%s)',
+                (info['id'], info['name'], info['ext'], info['tags'], info['file_url'])
+            )
+        else:
+            MYSQL.execute(
+                'insert into yande_img(yande_id,name,ext,en_tag) values (%s,%s,%s,%s)',
+                (info['id'], info['name'], info['ext'], info['tags'])
+            )
+    return total_result
 
-    # 设置重试机制
-    retry_strategy = Retry(total=3, backoff_factor=0.1, status_forcelist=[500, 502, 503, 504])
-    adapter = HTTPAdapter(max_retries=retry_strategy)
-    session.mount('http://', adapter)
-    session.mount('https://', adapter)
 
-    if proxies:
-        session.proxies.update(proxies)
+def download_img(file_url: str, path: str, user_agent: str):
+    download_fail_count = 0
+    while download_fail_count < 3:
+        try:
+            response = requests.get(
+                url=file_url,
+                headers={'User-Agent': user_agent}
+            )
+            if not response.ok:
+                download_fail_count += 1
+                switch_proxy()
+                continue
+            with open(path, 'wb') as f:
+                f.write(response.content)
+                return True
+        except Exception as e:
+            download_fail_count += 1
+            switch_proxy()
+            YANDE_LOGGER.log('error', f'下载图片异常：{e}')
+    return False
 
-    session.headers.update(headers)
 
-    response = session.get(url, timeout=5, stream=True)
-    response.raise_for_status()  # 确保HTTP请求返回200状态码
-
-    # 写入文件
-    with open(path, 'wb') as file:
-        for chunk in response.iter_content(chunk_size=8192):
-            file.write(chunk)
-
-    print(f"文件已成功下载到: {path}")
+def exist_db_data(yande_id: int):
+    db_data = MYSQL.query('select count(1) as num from yande_img where yande_id = %s', yande_id)
+    if db_data[0][0] is not None:
+        return db_data[0][0] > 0
+    return False
 
 
 def stop():
-    print("关闭程序")
-    other = MySqlTool(host='localhost', user='root', password='admin', database='neptune')
-    other.execute('update yande_config set page = %s where id = 1', (page))
+    YANDE_LOGGER.log('info', f'程序结束前是否有需要下载的图片:{len(DOWNLOAD_INFO_LIST) > 0}')
+    if len(DOWNLOAD_INFO_LIST) > 0:
+        threading_download_image()
+    save_config_db_data()
+    YANDE_LOGGER.log('info', '程序结束')
     sys.exit(0)
 
 
-def save_data():
-    other = MySqlTool(host='localhost', user='root', password='admin', database='neptune')
-    other.execute('update yande_config set page = %s where id = 1', (page))
+def save_config_db_data():
+    MYSQL.execute('update yande_config set page = %s where id = 1', YANDE_PAGE)
+    YANDE_LOGGER.log('info', f'保存当前页数{YANDE_PAGE}')
 
 
 if __name__ == '__main__':
-    atexit.register(save_data)
-    threading.Timer(60 * 10, stop).start()
+    atexit.register(save_config_db_data)
+    # threading.Timer(60 * 120, stop).start()
     main()
