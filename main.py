@@ -76,7 +76,7 @@ def start_crawler():
 # 分页爬取
 def crawler_page():
     global YANDE_PAGE_FAIL_COUNT, YANDE_PAGE
-    url = f'https://yande.re/post.xml?limit=100&page={YANDE_PAGE}'
+    url = f'https://yande.re/post.xml?limit=1000&page={YANDE_PAGE}'
     header = {
         'User-Agent': YANDE_AGENT_POOL.get()
     }

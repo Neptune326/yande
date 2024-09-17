@@ -7,6 +7,7 @@ import numpy as np
 JS示范：document.querySelectorAll('a#highres.original-file-changed')[0].href
 '''
 
+
 def is_single_color_block(image_path, block_size=50, color_threshold=0.5):
     # 读取图像
     img = cv2.imread(image_path)
