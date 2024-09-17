@@ -17,11 +17,13 @@ from yande_logger import YandeLogger
 # 循环次数
 YANDE_RUN_CIRCULATE_COUNT = 5
 # 每次循环时间
-YANDE_RUNT_TIME_MINUTE = 60
+YANDE_RUNT_TIME_MINUTE = 10
 # 起始分页
 YANDE_PAGE = 0
 # 评分
-YANDE_SCORE = 100
+YANDE_E_SCORE = 100
+# 评分
+YANDE_S_SCORE = 50
 # 页面爬取错误次数
 YANDE_PAGE_FAIL_COUNT = 0
 # 下载失败最大次数
@@ -34,7 +36,7 @@ MYSQL = MySqlTool(host='localhost', user='root', password='admin', database='nep
 config_data = MYSQL.query('select page, score from yande_config')
 if config_data:
     YANDE_PAGE = int(config_data[0][0])
-    YANDE_SCORE = int(config_data[0][1])
+    # YANDE_SCORE = int(config_data[0][1])
 
 YANDE_LOGGER = YandeLogger(file_path='D:\\files\\logs\\yande')
 YANDE_AGENT_POOL = AgentPool()
@@ -102,11 +104,16 @@ def crawler_page():
         dom = soup.select('post')
         for item in dom:
             id = int(item['id'])
-            YANDE_LOGGER.log('info', f'page:{YANDE_PAGE} id:{id} score:{item["score"]} rating:{item["rating"]}')
-            if int(item['score']) < YANDE_SCORE:
-                continue
-
             rating = item['rating']
+            YANDE_LOGGER.log('info', f'page:{YANDE_PAGE} id:{id} score:{item["score"]} rating:{item["rating"]}')
+
+            if rating == 's':
+                if int(item['score']) < YANDE_S_SCORE:
+                    continue
+            else:
+                if int(item['score']) < YANDE_E_SCORE:
+                    continue
+
             tags = item['tags']
             file_url = item['file_url']
             file_ext = item['file_ext']
