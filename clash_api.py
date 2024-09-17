@@ -31,7 +31,7 @@ class ClashAPI:
         proxies = [
             proxy["name"]
             for proxy in nodes.values()
-            if proxy["type"] == "Shadowsocks" or proxy["type"] == "Vmess"
+            if proxy["type"] == "Shadowsocks" or proxy["type"] == "Vmess" or proxy["type"] == "Trojan"
         ]
         return proxies
 

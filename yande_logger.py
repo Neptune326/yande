@@ -1,5 +1,5 @@
-import logging
 import inspect
+import logging
 import os
 import time
 
@@ -50,10 +50,8 @@ class YandeLogger:
 
     def log(self, level, message):
         frame = inspect.stack()[1]
-        module = inspect.getmodule(frame[0])
-        file_path = os.path.abspath(module.__file__)
         function_name = frame[3]
         line_number = frame[2]
 
-        log_message = f"File: {file_path}, Function: {function_name}, Line: {line_number} \n{message} "
+        log_message = f" Function: {function_name}, Line: {line_number} \n{message} "
         getattr(self.logger, level)(log_message)

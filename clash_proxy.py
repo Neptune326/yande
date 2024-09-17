@@ -16,26 +16,17 @@ CLASH_PROXIES_LIST = [
     "HongKong-IPLC-HK-BETA3-Rate:1.0",
     "HongKong-IPLC-HK-BETA4-Rate:1.0",
     "HongKong-IPLC-HK-BETA5-Rate:1.0",
-    "UnitedStates-US-1-Rate:1.5",
-    "UnitedStates-US-2-Rate:1.0",
-    "UnitedStates-US-3-Rate:1.0",
-    "UnitedStates-US-4-Rate:1.0",
-    "UnitedStates-US-5-Rate:1.0",
     "HongKong-HK-1-Rate:0.5",
     "HongKong-HK-2-Rate:0.5",
-    "Japan-TY-1-Rate:1.0",
-    "Japan-TY-2-Rate:1.0",
-    "Japan-TY-3-Rate:1.0",
-    "Japan-TY-4-Rate:1.0",
     "Japan-OS-1-Rate:1.0",
     "Japan-OS-2-Rate:1.0",
     "Japan-OS-3-Rate:1.0",
     "Taiwan-TW-1-Rate:1.0",
-    "Taiwan-TW-2-Rate:1.0",
-    "UnitedStates-V6-US3-Rate:1.0"
+    "Taiwan-TW-2-Rate:1.0"
 ]
 
 
+# 获取节点数据
 def get_proxies():
     response = requests.get(
         url=CLASH_API_PROXIES,
@@ -47,6 +38,7 @@ def get_proxies():
         raise Exception('Failed to fetch proxies')
 
 
+# 切换节点
 def switch_proxy():
     proxy_name = random.choice(CLASH_PROXIES_LIST)
     response = requests.put(
@@ -56,8 +48,10 @@ def switch_proxy():
     )
     if response.status_code == 204:
         print(f'Successfully switched to {proxy_name}')
+        return True
     else:
         print(f'Failed to switch to {proxy_name}')
+        return False
 
 # if __name__ == "__main__":
 #     proxies = get_proxies()
