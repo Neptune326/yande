@@ -15,7 +15,7 @@ from mysql_tool import MySqlTool
 from yande_logger import YandeLogger
 
 # 循环次数
-YANDE_RUN_CIRCULATE_COUNT = 3
+YANDE_RUN_CIRCULATE_COUNT = 5
 # 每次循环时间
 YANDE_RUNT_TIME_MINUTE = 60
 # 起始分页
@@ -26,6 +26,8 @@ YANDE_SCORE = 100
 YANDE_PAGE_FAIL_COUNT = 0
 # 下载失败最大次数
 YANDE_IMG_FAIL_MAX = 3
+# 下载失败总次数
+YANDE_IMG_FAIL_TOTAL = 0
 # 文件下载路径
 YANDE_FILE_PATH = 'D:\\files\\yande\\'
 MYSQL = MySqlTool(host='localhost', user='root', password='admin', database='neptune')
@@ -43,12 +45,15 @@ YANDE_PROXY_LOCK = threading.Lock()
 
 
 def main():
-    global YANDE_RUN_CIRCULATE_COUNT
+    global YANDE_RUN_CIRCULATE_COUNT, YANDE_PAGE_FAIL_COUNT, YANDE_IMG_FAIL_TOTAL
     for i in range(YANDE_RUN_CIRCULATE_COUNT):
         YANDE_LOGGER.log('info', f'第{i + 1}次循环开始')
         start_crawler()
         YANDE_LOGGER.log('info', f'第{i + 1}次循环结束')
         time.sleep(10)
+
+        YANDE_PAGE_FAIL_COUNT = 0
+        YANDE_IMG_FAIL_TOTAL = 0
 
 
 # 开始爬虫
@@ -75,7 +80,7 @@ def start_crawler():
 
 # 分页爬取
 def crawler_page():
-    global YANDE_PAGE_FAIL_COUNT, YANDE_PAGE
+    global YANDE_PAGE_FAIL_COUNT, YANDE_PAGE, YANDE_IMG_FAIL_TOTAL
     url = f'https://yande.re/post.xml?limit=1000&page={YANDE_PAGE}'
     header = {
         'User-Agent': YANDE_AGENT_POOL.get()
@@ -117,14 +122,13 @@ def crawler_page():
 
             path = os.path.join(dir_name, name)
 
-            data_exist_result = exist_db_data(id)
-            file_exist_result = os.path.exists(path)
-
-            if data_exist_result and file_exist_result:
-                if data_exist_result:
-                    YANDE_LOGGER.log('info', f'IMAGE-id:{id}已存在[数据]')
-                if file_exist_result:
-                    YANDE_LOGGER.log('info', f'IMAGE-id:{id}已存在[文件]')
+            if os.path.exists(path):
+                YANDE_LOGGER.log('info', f'IMAGE-id:{id}已存在[文件]')
+                if not exist_db_data(id):
+                    MYSQL.execute(
+                        'insert into yande_img(yande_id,name,ext,en_tag) values (%s,%s,%s,%s)',
+                        (id, name, file_ext, en_tag)
+                    )
                 continue
 
             DOWNLOAD_INFO_LIST.append({
@@ -139,9 +143,11 @@ def crawler_page():
             if len(DOWNLOAD_INFO_LIST) >= 8:
                 download_result = threading_download_image()
                 if not download_result:
-                    MYSQL.execute('update yande_config set page = %s where id = 1', YANDE_PAGE)
-                    YANDE_LOGGER.log('error', f'threading_download_image failed')
-                    raise Exception('threading_download_image failed')
+                    YANDE_IMG_FAIL_TOTAL += 1
+                    if YANDE_IMG_FAIL_TOTAL >= 5:
+                        save_config_db_data()
+                        YANDE_LOGGER.log('error', f'threading_download_image failed')
+                        raise Exception('threading_download_image failed')
                 else:
                     DOWNLOAD_INFO_LIST.clear()
                     time.sleep(random.randint(2, 3))

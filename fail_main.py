@@ -48,8 +48,20 @@ def is_single_color_block(image_path, block_size=50, color_threshold=0.5):
 
 
 # 使用函数检测图像
-image_path = 'D:\\files\\yande\\Question\\109\\1092279.png'
+image_path = 'D:\\files\\yande\\Question\\109\\1096799.png'
 if is_single_color_block(image_path):
     print("图像中存在大块单一颜色区域")
 else:
     print("图像中没有大块单一颜色区域")
+
+
+def download():
+    pass
+
+
+def main():
+    pass
+
+
+if __name__ == '__main__':
+    main()
