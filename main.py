@@ -89,7 +89,7 @@ def crawler_page():
     }
     with requests.get(url=url, headers=header, timeout=5) as response:
         if not response.ok:
-            MYSQL.execute('update yande_config set page = %s where id = 1', YANDE_PAGE)
+            save_config_db_data()
 
             switch_clash_proxy()
 
@@ -122,8 +122,10 @@ def crawler_page():
             en_tag = '|'.join(tags.split(' '))
             name = f'{id}.{file_ext}'
 
-            dir_name = len(item['id']) < 4 and 'default' or item['id'][:len(item['id']) - 4]
-            dir_name = os.path.join(YANDE_FILE_PATH, rating == 's' and 'Safe' or 'Question', dir_name)
+            last_level_dir_name = len(item['id']) < 4 and '0' or item['id'][:len(item['id']) - 4]
+            dir_name = os.path.join(YANDE_FILE_PATH,
+                                    rating == 's' and 'Safe' or rating == 'e' and 'Explicit' or 'Questionable',
+                                    last_level_dir_name)
             if not os.path.exists(dir_name):
                 os.makedirs(dir_name)
 
@@ -131,16 +133,40 @@ def crawler_page():
 
             if os.path.exists(path):
                 YANDE_LOGGER.log('info', f'IMAGE-id:{id}已存在[文件]')
+
                 if not exist_db_data(id):
                     MYSQL.execute(
-                        'insert into yande_img(yande_id,name,ext,en_tag) values (%s,%s,%s,%s)',
-                        (id, name, file_ext, en_tag)
+                        'insert into yande_img(yande_id,rating,name,ext,en_tag) values (%s,%s,%s,%s,%s)',
+                        (id, rating, name, file_ext, en_tag)
+                    )
+                else:
+                    MYSQL.execute(
+                        'update yande_img set rating = %s, name = %s, ext = %s, en_tag = %s where yande_id = %s',
+                        (rating, name, file_ext, en_tag, id)
                     )
                 continue
+            else:
+                if rating != 's':
+                    old_path = os.path.join(YANDE_FILE_PATH, 'Question', last_level_dir_name, name)
+                    if os.path.exists(old_path):
+                        YANDE_LOGGER.log('info', f'IMAGE-id:{id}已存在[文件]于旧目录中')
+                        os.rename(old_path, path)
+                        if not exist_db_data(id):
+                            MYSQL.execute(
+                                'insert into yande_img(yande_id,rating,name,ext,en_tag) values (%s,%s,%s,%s,%s)',
+                                (id, rating, name, file_ext, en_tag)
+                            )
+                        else:
+                            MYSQL.execute(
+                                'update yande_img set rating = %s, name = %s, ext = %s, en_tag = %s where yande_id = %s',
+                                (rating, name, file_ext, en_tag, id)
+                            )
+                        continue
 
             DOWNLOAD_INFO_LIST.append({
                 'id': id,
                 'name': name,
+                'rating': rating,
                 'ext': file_ext,
                 'path': path,
                 'tags': en_tag,
@@ -165,7 +191,7 @@ def threading_download_image():
     total_result = True
     thread_pool = []
     for info in DOWNLOAD_INFO_LIST:
-        thread = DownloadTaskThread(download_img, args=(info['file_url'], info['path'], YANDE_AGENT_POOL.get()))
+        thread = DownloadTaskThread(download_img, args=(info['file_url'], info['path']))
         thread_pool.append(thread)
         thread.start()
 
@@ -181,21 +207,21 @@ def threading_download_image():
             )
         else:
             MYSQL.execute(
-                'insert into yande_img(yande_id,name,ext,en_tag) values (%s,%s,%s,%s)',
-                (info['id'], info['name'], info['ext'], info['tags'])
+                'insert into yande_img(yande_id,name,rating,ext,en_tag) values (%s,%s,%s,%s,%s)',
+                (info['id'], info['name'], info['rating'], info['ext'], info['tags'])
             )
 
     return total_result
 
 
 # 下载
-def download_img(file_url: str, path: str, user_agent: str):
+def download_img(file_url: str, path: str):
     download_fail_count = 0
     while download_fail_count < YANDE_IMG_FAIL_MAX:
         try:
             response = requests.get(
                 url=file_url,
-                headers={'User-Agent': user_agent},
+                headers={'User-Agent': YANDE_AGENT_POOL.get()},
                 timeout=10
             )
             if not response.ok:
@@ -227,6 +253,7 @@ def exist_db_data(yande_id: int):
 
 # 切换clash节点
 def switch_clash_proxy():
+    global YANDE_PROXY_LOCK
     with YANDE_PROXY_LOCK:
         switch_result = switch_proxy()
         if switch_result:

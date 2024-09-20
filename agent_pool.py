@@ -1,4 +1,7 @@
 import json
+import threading
+
+AGENT_POOL_LOCK = threading.Lock()
 
 
 class AgentPool:
@@ -9,7 +12,8 @@ class AgentPool:
             self.json = agent_json
 
     def get(self):
-        return self.json[self.index]
+        with AGENT_POOL_LOCK:
+            return self.json[self.index]
 
     def remove(self):
         self.json.pop(self.index)

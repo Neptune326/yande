@@ -1,3 +1,4 @@
+import os
 import time
 
 # s = 'aaa bbb'
@@ -48,11 +49,34 @@ import time
 # dir_name = os.path.join("D://test", rating == 's' and 'Safe' or 'Question', dir_name)
 # print(dir_name)
 
-a = time.time()
-print(a)
-time.sleep(1)
-b = time.time()
-print(b)
-print(b - a)
-print(b - a > 60 * 60)
-print(b - a > 60 * 60 * 24 * 7)
+# a = time.time()
+# print(a)
+# time.sleep(1)
+# b = time.time()
+# print(b)
+# print(b - a)
+# print(b - a > 60 * 60)
+# print(b - a > 60 * 60 * 24 * 7)
+
+# a = 'q'
+# b = a == 's' and 'S' or a == 'e' and 'E' or 'Q'
+# print(b)
+#
+# # 文件移动
+# file1 = 'D:\\files\\flex\\logs\\app.log'
+# file2 = 'D:\\files\\app.log'
+# os.rename(file1, file2)
+
+# import threading
+#
+# lock = threading.Lock()
+#
+# # 尝试获取锁
+# if lock.acquire():  # 非阻塞尝试获取锁
+#     print("锁未被占用，我们已获取到锁。")
+#     lock.release()
+# else:
+#     print("锁已被占用，无法获取。")
+
+
+print(os.path.exists("D:\\test\\aaa.txt"))

@@ -3,6 +3,10 @@ import random
 
 import requests
 
+'''
+测试延迟：http://127.0.0.1:9097/proxies/代理节点的名称/delay?url=http://www.gstatic.com/generate_204&timeout=5000
+'''
+
 # 定义 Clash API 的基本信息
 CLASH_API_URL = 'http://127.0.0.1:9097'
 CLASH_API_SWITCH = f'{CLASH_API_URL}/proxies/GLOBAL'
