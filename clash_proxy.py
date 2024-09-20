@@ -1,5 +1,4 @@
 import json
-import random
 
 import requests
 
@@ -14,6 +13,7 @@ CLASH_API_PROXIES = f'{CLASH_API_URL}/proxies'
 
 CLASH_API_HEADERS = {'Authorization': 'Bearer ', 'Content-Type': 'application/json'}
 
+CLASH_PROXIES_INDEX = 0
 CLASH_PROXIES_LIST = [
     "HongKong-IPLC-HK-BETA1-Rate:1.0",
     "HongKong-IPLC-HK-BETA2-Rate:1.0",
@@ -26,7 +26,12 @@ CLASH_PROXIES_LIST = [
     "Japan-OS-2-Rate:1.0",
     "Japan-OS-3-Rate:1.0",
     "Taiwan-TW-1-Rate:1.0",
-    "Taiwan-TW-2-Rate:1.0"
+    "Taiwan-TW-2-Rate:1.0",
+    "UnitedStates-US-1-Rate:1.5",
+    "UnitedStates-US-2-Rate:1.0",
+    "UnitedStates-US-3-Rate:1.0",
+    "UnitedStates-US-4-Rate:1.0",
+    "UnitedStates-US-5-Rate:1.0"
 ]
 
 
@@ -42,20 +47,50 @@ def get_proxies():
         raise Exception('Failed to fetch proxies')
 
 
+# 获取下一个节点
+def get_next_proxy():
+    global CLASH_PROXIES_INDEX
+    CLASH_PROXIES_INDEX += 1
+    if CLASH_PROXIES_INDEX >= len(CLASH_PROXIES_LIST):
+        CLASH_PROXIES_INDEX = 0
+    return CLASH_PROXIES_LIST[CLASH_PROXIES_INDEX]
+
+
+# 测试延迟
+def test_delay(proxy: str):
+    try:
+        response = requests.get(
+            url=f'{CLASH_API_PROXIES}/{proxy}/delay?url=http://www.gstatic.com/generate_204&timeout=5000',
+            headers=CLASH_API_HEADERS
+        )
+        res = response.json()
+        delay = res['delay']
+        if delay:
+            return int(delay)
+        return -1
+    except Exception as e:
+        print(f'Failed to test delay for {proxy}: {e}')
+        return -1
+
+
 # 切换节点
 def switch_proxy():
-    proxy_name = random.choice(CLASH_PROXIES_LIST)
-    response = requests.put(
-        url=CLASH_API_SWITCH,
-        headers=CLASH_API_HEADERS,
-        data=json.dumps({"name": proxy_name})
-    )
-    if response.status_code == 204:
-        print(f'Successfully switched to {proxy_name}')
-        return True
-    else:
-        print(f'Failed to switch to {proxy_name}')
-        return False
+    for i in range(5):
+        proxy_name = get_next_proxy()
+        delay = test_delay(proxy_name)
+        if delay == -1 or delay > 2000:
+            continue
+        response = requests.put(
+            url=CLASH_API_SWITCH,
+            headers=CLASH_API_HEADERS,
+            data=json.dumps({"name": proxy_name})
+        )
+        if response.status_code == 204:
+            print(f'Successfully switched to {proxy_name}')
+            return True
+
+    print(f'Failed to switch')
+    return False
 
 # if __name__ == "__main__":
 #     proxies = get_proxies()
