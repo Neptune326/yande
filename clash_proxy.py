@@ -66,6 +66,7 @@ def test_delay(proxy: str):
         res = response.json()
         delay = res['delay']
         if delay:
+            print(f'Proxy delay for {proxy}: {delay}')
             return int(delay)
         return -1
     except Exception as e:

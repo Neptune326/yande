@@ -17,7 +17,7 @@ from yande_logger import YandeLogger
 # 循环次数
 YANDE_RUN_CIRCULATE_COUNT = 5
 # 每次循环时间
-YANDE_RUNT_TIME_MINUTE = 10
+YANDE_RUNT_TIME_MINUTE = 20
 # 起始分页
 YANDE_PAGE = 0
 # 评分
