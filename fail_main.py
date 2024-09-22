@@ -1,5 +1,8 @@
 import cv2
 import numpy as np
+import requests
+from bs4 import BeautifulSoup
+
 
 '''
 获取单个数据页面API：https://yande.re/post/show/1194966
@@ -48,11 +51,11 @@ def is_single_color_block(image_path, block_size=50, color_threshold=0.5):
 
 
 # 使用函数检测图像
-image_path = 'D:\\files\\yande\\Question\\109\\1096799.png'
-if is_single_color_block(image_path):
-    print("图像中存在大块单一颜色区域")
-else:
-    print("图像中没有大块单一颜色区域")
+# image_path = 'D:\\files\\yande\\Question\\109\\1096799.png'
+# if is_single_color_block(image_path):
+#     print("图像中存在大块单一颜色区域")
+# else:
+#     print("图像中没有大块单一颜色区域")
 
 
 def download():
@@ -64,4 +67,18 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        response = requests.get(
+            url=f'https://yande.re/post/show/1194966',
+            headers={'User-Agent': "Mozilla/4.0 (compatible; MSIE 7.0; Windows NT 6.0)"},
+            timeout=5
+        )
+        if not response.ok:
+            print('error','下载历史错误图片失败')
+        html = response.text
+        soup = BeautifulSoup(html, 'html.parser')
+        # document.querySelectorAll('a#highres.original-file-changed')[0].href
+        img_url = soup.select_one('a#highres.original-file-changed').get('href')
+        print(img_url)
+    except Exception as e:
+        print.log('error','下载历史错误图片失败')

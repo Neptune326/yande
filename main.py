@@ -21,9 +21,9 @@ YANDE_RUNT_TIME_MINUTE = 20
 # 起始分页
 YANDE_PAGE = 0
 # 评分
-YANDE_E_SCORE = 100
+YANDE_E_SCORE = 200
 # 评分
-YANDE_S_SCORE = 50
+YANDE_S_SCORE = 80
 # 页面爬取错误次数
 YANDE_PAGE_FAIL_COUNT = 0
 # 下载失败最大次数
@@ -107,13 +107,6 @@ def crawler_page():
             rating = item['rating']
             YANDE_LOGGER.log('info', f'page:{YANDE_PAGE} id:{id} score:{item["score"]} rating:{item["rating"]}')
 
-            if rating == 's':
-                if int(item['score']) < YANDE_S_SCORE:
-                    continue
-            else:
-                if int(item['score']) < YANDE_E_SCORE:
-                    continue
-
             tags = item['tags']
             file_url = item['file_url']
             file_ext = item['file_ext']
@@ -123,13 +116,24 @@ def crawler_page():
             name = f'{id}.{file_ext}'
 
             last_level_dir_name = len(item['id']) < 4 and '0' or item['id'][:len(item['id']) - 4]
-            dir_name = os.path.join(YANDE_FILE_PATH,
-                                    rating == 's' and 'Safe' or rating == 'e' and 'Explicit' or 'Questionable',
-                                    last_level_dir_name)
+            dir_name = os.path.join(
+                YANDE_FILE_PATH,
+                rating == 's' and 'Safe' or rating == 'e' and 'Explicit' or 'Questionable',
+                last_level_dir_name
+            )
             if not os.path.exists(dir_name):
                 os.makedirs(dir_name)
 
             path = os.path.join(dir_name, name)
+
+            if rating == 's':
+                if int(item['score']) < YANDE_S_SCORE:
+                    continue
+            else:
+                if int(item['score']) < YANDE_E_SCORE:
+                    if os.path.exists(path):
+                        os.remove(path)
+                    continue
 
             if os.path.exists(path):
                 YANDE_LOGGER.log('info', f'IMAGE-id:{id}已存在[文件]')
@@ -277,6 +281,30 @@ def stop():
 def save_config_db_data():
     MYSQL.execute('update yande_config set page = %s where id = 1', YANDE_PAGE)
     YANDE_LOGGER.log('info', f'保存当前页数{YANDE_PAGE}')
+
+
+def download_error_image():
+    error_data = MYSQL.query("select yande_id from yande_download_error")
+    if not error_data:
+        return
+    for error_item in error_data:
+        yande_id = error_item[0]
+        try:
+            response = requests.get(
+                url=f'https://yande.re/post/show/{yande_id}',
+                headers={'User-Agent': YANDE_AGENT_POOL.get()},
+                timeout=5
+            )
+            if not response.ok:
+                switch_clash_proxy()
+                YANDE_LOGGER.log('error', '下载历史错误图片失败')
+                continue
+            html = response.text
+
+        except Exception as e:
+            switch_clash_proxy()
+            YANDE_LOGGER.log('error', '下载历史错误图片失败')
+            continue
 
 
 if __name__ == '__main__':

@@ -79,4 +79,4 @@ import time
 #     print("锁已被占用，无法获取。")
 
 
-print(os.path.exists("D:\\test\\aaa.txt"))
+os.remove('D:\\files\\test\\新建 文本文档 (2).txt')
