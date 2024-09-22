@@ -1,3 +1,6 @@
+import json
+import urllib.parse
+
 import cv2
 import numpy as np
 import requests
@@ -66,7 +69,21 @@ def main():
     pass
 
 
+
+import re
+
+text = ' Post.register_resp({"posts":[{"id":1194966,"tags":"fu_u03","created_at":1726568030,"updated_at":1726568033,"creator_id":175701,"approver_id":null,"author":"saemonnokami","change":6119099,"source":"https://i.pximg.net/img-original/img/2024/06/30/00/00/20/120094347_p0.jpg","score":19,"md5":"3cc60c29f1c04396ef29cc7db1f311a2","file_size":4119872,"file_ext":"jpg","file_url":"https://files.yande.re/image/3cc60c29f1c04396ef29cc7db1f311a2/yande.re%201194966%20fu_u03.jpg","is_shown_in_index":true,"preview_url":"https://assets.yande.re/data/preview/3c/c6/3cc60c29f1c04396ef29cc7db1f311a2.jpg","preview_width":86,"preview_height":150,"actual_preview_width":172,"actual_preview_height":300,"sample_url":"https://files.yande.re/sample/3cc60c29f1c04396ef29cc7db1f311a2/yande.re%201194966%20sample%20fu_u03.jpg","sample_width":858,"sample_height":1500,"sample_file_size":196860,"jpeg_url":"https://files.yande.re/image/3cc60c29f1c04396ef29cc7db1f311a2/yande.re%201194966%20fu_u03.jpg","jpeg_width":3049,"jpeg_height":5330,"jpeg_file_size":0,"rating":"s","is_rating_locked":false,"has_children":false,"parent_id":null,"status":"active","is_pending":false,"width":3049,"height":5330,"is_held":false,"frames_pending_string":"","frames_pending":[],"frames_string":"","frames":[],"is_note_locked":false,"last_noted_at":0,"last_commented_at":0}],"pool_posts":[],"pools":[],"tags":{"fu_u03":"artist"},"votes":{}}); '
+pattern = r"Post.register_resp\(.*\)"  # 正则表达式，用于找到包含"test"的单词
+
+matches = re.findall(pattern, text)
+
+print(matches)  # 输出: ['test', 'string']
+# 读取matches[0]中的json数据
+
+print(json.loads(matches[0].replace("Post.register_resp(", "").replace(")", "")))
+
 if __name__ == '__main__':
+    pass
     try:
         response = requests.get(
             url=f'https://yande.re/post/show/1194966',
@@ -80,5 +97,6 @@ if __name__ == '__main__':
         # document.querySelectorAll('a#highres.original-file-changed')[0].href
         img_url = soup.select_one('a#highres.original-file-changed').get('href')
         print(img_url)
+        print(urllib.parse.unquote(img_url))
     except Exception as e:
         print.log('error','下载历史错误图片失败')

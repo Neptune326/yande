@@ -1,6 +1,8 @@
 import atexit
+import json
 import os
 import random
+import re
 import threading
 import time
 
@@ -297,13 +299,64 @@ def download_error_image():
             )
             if not response.ok:
                 switch_clash_proxy()
+                time.sleep(2, 5)
                 YANDE_LOGGER.log('error', '下载历史错误图片失败')
                 continue
             html = response.text
 
+            matches = re.findall(r"Post.register_resp\(.*\)", html)
+            if len(matches) == 0:
+                continue
+            match = matches[0].replace("Post.register_resp(", "").replace(")", "")
+            post_json = json.loads(match)
+            if not post_json or not post_json['posts'] or not len(post_json['posts']):
+                continue
+            post_data = post_json['posts'][0]
+
+            file_ext = post_data['file_ext']
+            file_url = post_data['file_url']
+            rating = post_data['rating']
+            tags = post_data['tags']
+            name = f'{yande_id}.{file_ext}'
+
+            last_level_dir_name = len(str(yande_id)) < 4 and '0' or str(yande_id)[:len(str(yande_id)) - 4]
+            dir_name = os.path.join(
+                YANDE_FILE_PATH,
+                rating == 's' and 'Safe' or rating == 'e' and 'Explicit' or 'Questionable',
+                last_level_dir_name
+            )
+            if not os.path.exists(dir_name):
+                os.makedirs(dir_name)
+
+            path = os.path.join(dir_name, name)
+            if os.path.exists(path):
+                MYSQL.execute('delete from yande_download_error where yande_id = %s', yande_id)
+                continue
+
+            response = requests.get(
+                url=file_url,
+                headers={'User-Agent': YANDE_AGENT_POOL.get()},
+                timeout=10
+            )
+            if not response.ok:
+                switch_clash_proxy()
+                time.sleep(2, 5)
+                continue
+            with open(path, 'wb') as f:
+                f.write(response.content)
+                if not exist_db_data(yande_id):
+                    MYSQL.execute(
+                        'insert into yande_img(yande_id,name,rating,ext,en_tag) values (%s,%s,%s,%s,%s)',
+                        (yande_id, name, rating, file_ext, tags)
+                    )
+                MYSQL.execute('delete from yande_download_error where yande_id = %s', yande_id)
+                YANDE_LOGGER.log('info', f'下载历史图片成功: {name}')
+                time.sleep(2, 5)
+
         except Exception as e:
             switch_clash_proxy()
             YANDE_LOGGER.log('error', '下载历史错误图片失败')
+            time.sleep(2, 5)
             continue
 
 
@@ -311,3 +364,4 @@ if __name__ == '__main__':
     atexit.register(save_config_db_data)
     # threading.Timer(60 * 120, stop).start()
     main()
+    download_error_image()
