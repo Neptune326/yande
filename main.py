@@ -348,25 +348,31 @@ def download_error_image():
                 MYSQL.execute('delete from yande_download_error where yande_id = %s', yande_id)
                 continue
 
-            response = requests.get(
-                url=file_url,
-                headers={'User-Agent': YANDE_AGENT_POOL.get()},
-                timeout=10
-            )
-            if not response.ok:
-                switch_clash_proxy()
-                time.sleep(2)
-                continue
-            with open(path, 'wb') as f:
-                f.write(response.content)
-                if not exist_db_data(yande_id):
-                    MYSQL.execute(
-                        'insert into yande_img(yande_id,name,rating,ext,en_tag) values (%s,%s,%s,%s,%s)',
-                        (yande_id, name, rating, file_ext, tags)
+            for i in range(5):
+                try:
+                    response = requests.get(
+                        url=file_url,
+                        headers={'User-Agent': YANDE_AGENT_POOL.get()},
+                        timeout=10
                     )
-                MYSQL.execute('delete from yande_download_error where yande_id = %s', yande_id)
-                YANDE_LOGGER.log('info', f'下载历史图片成功: {name}')
-                time.sleep(2)
+                    if not response.ok:
+                        switch_clash_proxy()
+                        time.sleep(2)
+                        continue
+                    with open(path, 'wb') as f:
+                        f.write(response.content)
+                        if not exist_db_data(yande_id):
+                            MYSQL.execute(
+                                'insert into yande_img(yande_id,name,rating,ext,en_tag) values (%s,%s,%s,%s,%s)',
+                                (yande_id, name, rating, file_ext, tags)
+                            )
+                        MYSQL.execute('delete from yande_download_error where yande_id = %s', yande_id)
+                        YANDE_LOGGER.log('info', f'下载历史图片成功: {name}')
+                        time.sleep(2)
+                        break
+                except Exception as e:
+                    switch_clash_proxy()
+                    time.sleep(2)
 
         except Exception as e:
             switch_clash_proxy()
