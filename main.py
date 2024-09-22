@@ -285,6 +285,11 @@ def save_config_db_data():
     YANDE_LOGGER.log('info', f'保存当前页数{YANDE_PAGE}')
 
 
+@atexit.register
+def save_before_close():
+    save_config_db_data()
+
+
 def download_error_image():
     error_data = MYSQL.query("select yande_id from yande_download_error")
     if not error_data:
@@ -299,7 +304,7 @@ def download_error_image():
             )
             if not response.ok:
                 switch_clash_proxy()
-                time.sleep(2, 5)
+                time.sleep(2)
                 YANDE_LOGGER.log('error', '下载历史错误图片失败')
                 continue
             html = response.text
@@ -316,7 +321,7 @@ def download_error_image():
             file_ext = post_data['file_ext']
             file_url = post_data['file_url']
             rating = post_data['rating']
-            tags = post_data['tags']
+            tags = '|'.join(post_data['tags'].split(' '))
             name = f'{yande_id}.{file_ext}'
 
             last_level_dir_name = len(str(yande_id)) < 4 and '0' or str(yande_id)[:len(str(yande_id)) - 4]
@@ -340,7 +345,7 @@ def download_error_image():
             )
             if not response.ok:
                 switch_clash_proxy()
-                time.sleep(2, 5)
+                time.sleep(2)
                 continue
             with open(path, 'wb') as f:
                 f.write(response.content)
@@ -351,17 +356,17 @@ def download_error_image():
                     )
                 MYSQL.execute('delete from yande_download_error where yande_id = %s', yande_id)
                 YANDE_LOGGER.log('info', f'下载历史图片成功: {name}')
-                time.sleep(2, 5)
+                time.sleep(2)
 
         except Exception as e:
             switch_clash_proxy()
             YANDE_LOGGER.log('error', '下载历史错误图片失败')
-            time.sleep(2, 5)
+            time.sleep(2)
             continue
 
 
 if __name__ == '__main__':
-    atexit.register(save_config_db_data)
+    atexit.register(save_before_close)
     # threading.Timer(60 * 120, stop).start()
     main()
     download_error_image()
