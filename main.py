@@ -334,6 +334,16 @@ def download_error_image():
                 os.makedirs(dir_name)
 
             path = os.path.join(dir_name, name)
+
+            if rating == 's':
+                if int(post_data['score']) < YANDE_S_SCORE:
+                    continue
+            else:
+                if int(post_data['score']) < YANDE_E_SCORE:
+                    if os.path.exists(path):
+                        os.remove(path)
+                    continue
+
             if os.path.exists(path):
                 MYSQL.execute('delete from yande_download_error where yande_id = %s', yande_id)
                 continue
