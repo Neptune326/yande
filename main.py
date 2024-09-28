@@ -17,15 +17,15 @@ from mysql_tool import MySqlTool
 from yande_logger import YandeLogger
 
 # 循环次数
-YANDE_RUN_CIRCULATE_COUNT = 5
+YANDE_RUN_CIRCULATE_COUNT = 2
 # 每次循环时间
-YANDE_RUNT_TIME_MINUTE = 20
+YANDE_RUNT_TIME_MINUTE = 30
 # 起始分页
 YANDE_PAGE = 0
 # 评分
-YANDE_E_SCORE = 200
+YANDE_E_SCORE = 250
 # 评分
-YANDE_S_SCORE = 80
+YANDE_S_SCORE = 150
 # 页面爬取错误次数
 YANDE_PAGE_FAIL_COUNT = 0
 # 下载失败最大次数
@@ -107,13 +107,11 @@ def crawler_page():
         for item in dom:
             id = int(item['id'])
             rating = item['rating']
-            YANDE_LOGGER.log('info', f'page:{YANDE_PAGE} id:{id} score:{item["score"]} rating:{item["rating"]}')
 
             tags = item['tags']
             file_url = item['file_url']
             file_ext = item['file_ext']
-            YANDE_LOGGER.log('info',
-                             f'page:{YANDE_PAGE} id:{id} score:{item["score"]} rating:{item["rating"]} tags:{item["tags"]} file_url:{item["file_url"]} file_ext:{item["file_ext"]}')
+
             en_tag = '|'.join(tags.split(' '))
             name = f'{id}.{file_ext}'
 
@@ -168,6 +166,9 @@ def crawler_page():
                                 (rating, name, file_ext, en_tag, id)
                             )
                         continue
+
+            YANDE_LOGGER.log('info',
+                             f'page:{YANDE_PAGE} id:{id} score:{item["score"]} rating:{item["rating"]} tags:{item["tags"]} file_url:{item["file_url"]} file_ext:{item["file_ext"]}')
 
             DOWNLOAD_INFO_LIST.append({
                 'id': id,
