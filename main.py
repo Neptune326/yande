@@ -1,7 +1,6 @@
 import atexit
 import json
 import os
-import random
 import re
 import threading
 import time
@@ -17,15 +16,15 @@ from mysql_tool import MySqlTool
 from yande_logger import YandeLogger
 
 # 循环次数
-YANDE_RUN_CIRCULATE_COUNT = 2
+YANDE_RUN_CIRCULATE_COUNT = 6
 # 每次循环时间
-YANDE_RUNT_TIME_MINUTE = 30
+YANDE_RUNT_TIME_MINUTE = 10
 # 起始分页
 YANDE_PAGE = 0
 # 评分
-YANDE_E_SCORE = 250
+YANDE_E_SCORE = 200
 # 评分
-YANDE_S_SCORE = 150
+YANDE_S_SCORE = 100
 # 页面爬取错误次数
 YANDE_PAGE_FAIL_COUNT = 0
 # 下载失败最大次数
@@ -50,11 +49,12 @@ YANDE_PROXY_LOCK = threading.Lock()
 
 def main():
     global YANDE_RUN_CIRCULATE_COUNT, YANDE_PAGE_FAIL_COUNT, YANDE_IMG_FAIL_TOTAL
+    switch_clash_proxy()
     for i in range(YANDE_RUN_CIRCULATE_COUNT):
         YANDE_LOGGER.log('info', f'第{i + 1}次循环开始')
         start_crawler()
         YANDE_LOGGER.log('info', f'第{i + 1}次循环结束')
-        time.sleep(10)
+        time.sleep(2)
 
         YANDE_PAGE_FAIL_COUNT = 0
         YANDE_IMG_FAIL_TOTAL = 0
@@ -74,12 +74,12 @@ def start_crawler():
                 stop()
                 return
 
-            time.sleep(random.randint(2, 5))
+            time.sleep(2)
     except Exception as e:
         save_config_db_data()
         YANDE_LOGGER.log('error', f'发生异常: {e}')
         switch_clash_proxy()
-        time.sleep(random.randint(20 * YANDE_PAGE_FAIL_COUNT, 30 * YANDE_PAGE_FAIL_COUNT))
+        time.sleep(5)
 
 
 # 分页爬取
@@ -131,8 +131,6 @@ def crawler_page():
                     continue
             else:
                 if int(item['score']) < YANDE_E_SCORE:
-                    if os.path.exists(path):
-                        os.remove(path)
                     continue
 
             if os.path.exists(path):
@@ -190,7 +188,7 @@ def crawler_page():
                         raise Exception('threading_download_image failed')
                 else:
                     DOWNLOAD_INFO_LIST.clear()
-                    time.sleep(random.randint(2, 3))
+                    time.sleep(2)
 
 
 # 多线程下载
@@ -234,7 +232,7 @@ def download_img(file_url: str, path: str):
             if not response.ok:
                 download_fail_count += 1
                 switch_clash_proxy()
-                time.sleep(random.randint(20 * download_fail_count, 30 * download_fail_count))
+                time.sleep(5)
                 continue
             with open(path, 'wb') as f:
                 f.write(response.content)
@@ -341,8 +339,6 @@ def download_error_image():
                     continue
             else:
                 if int(post_data['score']) < YANDE_E_SCORE:
-                    if os.path.exists(path):
-                        os.remove(path)
                     continue
 
             if os.path.exists(path):

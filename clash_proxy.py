@@ -68,7 +68,7 @@ def get_proxies():
             raise Exception('No proxies available')
         for proxy_name in all_list:
             delay = test_delay(proxy_name)
-            if delay == -1 or delay > 2000:
+            if delay == -1 or delay > 4000:
                 continue
             CLASH_PROXIES_LIST.append(proxy_name)
         if len(CLASH_PROXIES_LIST) == 0:
@@ -77,9 +77,6 @@ def get_proxies():
         return True
     else:
         raise Exception('Failed to fetch proxies')
-
-
-print(get_proxies())
 
 
 # 获取下一个节点
@@ -95,6 +92,8 @@ def get_next_proxy():
 
 # 切换节点
 def switch_proxy():
+    if len(CLASH_PROXIES_LIST) == 0:
+        get_proxies()
     for i in range(len(CLASH_PROXIES_LIST)):
         proxy_name = get_next_proxy()
         delay = test_delay(proxy_name)

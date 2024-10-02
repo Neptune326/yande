@@ -36,6 +36,8 @@ def translate():
             else:
                 if en not in translate_fail_list:
                     try:
+                        translate_fail_list.append(en)
+                        continue
                         cn = you_dao_translate(en)
                         tag_dict[en] = cn
                         mysql.execute('INSERT INTO yande_tag(en, cn) VALUES(%s, %s)', (en, cn))
@@ -50,7 +52,11 @@ def translate():
             cn_tag_list.append(cn)
 
         cn_tag = '|'.join(cn_tag_list)
-        mysql.execute('UPDATE yande_img SET cn_tag = %s WHERE id = %s', (cn_tag, data_id))
+        # mysql.execute('UPDATE yande_img SET cn_tag = %s WHERE id = %s', (cn_tag, data_id))
+
+    # translate_fail_list去重
+    translate_fail_list = list(set(translate_fail_list))
+    print(translate_fail_list)
 
 
 def you_dao_translate(en_text: str):
