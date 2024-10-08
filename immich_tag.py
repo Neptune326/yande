@@ -4,12 +4,12 @@ import requests
 
 from mysql_tool import MySqlTool
 
-API_KEY = 'string'
+API_KEY = 'key-xxx'
 API_URL = 'http://ip:port/api'
 url = "http://ip:port/api/search/metadata"
 
 payload = json.dumps({
-    "deviceId": "string",
+    "deviceId": "Library Import",
     "order": "desc",
     "page": 1,
     "size": 100
@@ -17,7 +17,7 @@ payload = json.dumps({
 headers = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
-    'x-api-key': '9IP9zlGrvPwZSOLMKJRZcEkiFsSSGPBiZd2PTrJ4'
+    'x-api-key': 'key-xxx'
 }
 
 mysql = MySqlTool(host='localhost', user='root', password='admin', database='neptune')
@@ -59,7 +59,7 @@ while True:
         original_file_name = item['originalFileName']
         yande_id = int(original_file_name.split('.')[0])
 
-        select_data = mysql.query('select en_tag from yande_img where yande_id = %s', (yande_id))
+        select_data = mysql.query('select en_tag, rating from yande_img where yande_id = %s', (yande_id))
         if not select_data:
             continue
         en_tag = select_data[0][0]
@@ -68,7 +68,8 @@ while True:
         en_tag_list = en_tag.split('|')
         if len(en_tag_list) == 0:
             continue
-        cn_tag_list = []
+        rating = select_data[0][1]
+        cn_tag_list = [rating == 'e' and 'Explicit' or rating == 'q' and 'Questionable' or 'Safe']
         for en in en_tag_list:
             if en in LOCAL_TAG_DICT:
                 cn = LOCAL_TAG_DICT[en]
@@ -105,5 +106,7 @@ while True:
                 "tagIds": tagIds
             })
         )
+
+        print(f'originalFileName: {original_file_name} tags: {cn_tag_list}')
 
     page += 1
